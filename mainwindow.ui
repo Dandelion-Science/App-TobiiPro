@@ -187,7 +187,7 @@ powered by Tobii</string>
  <connections>
   <connection>
    <sender>trackerDropdown</sender>
-   <signal>activated(QString)</signal>
+   <signal>textActivated(QString)</signal>
    <receiver>address</receiver>
    <slot>setText(QString)</slot>
    <hints>

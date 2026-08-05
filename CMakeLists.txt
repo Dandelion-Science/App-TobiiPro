@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.16)
 project(TobiiPro
 	LANGUAGES CXX
 	VERSION 1.13.0)
@@ -23,7 +23,9 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
+# Qt6: liblsl >= 1.16's LSL_deploy_qt() expects Qt6::qmake, so Qt5 was the
+# mismatched half. Qt6 also requires C++17 (see cxx_std_17 below).
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 find_package(Threads REQUIRED)
 
@@ -43,13 +45,13 @@ target_link_libraries(tobiifinder TobiiPro::tobii_research)
 
 target_link_libraries(${PROJECT_NAME}
 	PRIVATE
-	Qt5::Widgets
+	Qt6::Widgets
 	Threads::Threads
 	LSL::lsl
 	TobiiPro::tobii_research
 )
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
-target_compile_features(tobiisynctest PUBLIC cxx_std_14)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+target_compile_features(tobiisynctest PUBLIC cxx_std_17)
 
 installLSLApp(${PROJECT_NAME})
 get_filename_component(_tobii_libdir ${TOBIIPRO_LIBRARY} DIRECTORY)
