@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QCloseEvent>
+#include <QComboBox>
 #include <QDebug>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -61,6 +62,35 @@ void push_tobii_gaze(TobiiResearchGazeData *g, void *gaze_stream) {
 	samples_written++;
 };
 
+// Fill a combo box with the gaze output frequencies supported by the tracker at
+// `address`, preselecting the rate the device is currently set to.
+//
+// Keyed on address rather than on the enumeration order: an earlier version read
+// eyetrackers[0], so with two trackers connected the rates shown were always the
+// first tracker's regardless of which one was selected.
+static void populate_rates(QComboBox *combo, const QString &address) {
+	combo->clear();
+	if (address.isEmpty()) return;
+
+	TobiiResearchEyeTracker *et = nullptr;
+	const QByteArray addr = address.toLocal8Bit();
+	if (tobii_research_get_eyetracker(addr.constData(), &et) != TOBII_RESEARCH_STATUS_OK)
+		return;
+
+	TobiiResearchGazeOutputFrequencies *freqs = nullptr;
+	if (tobii_research_get_all_gaze_output_frequencies(et, &freqs) != TOBII_RESEARCH_STATUS_OK)
+		return;
+	for (std::size_t i = 0; i < freqs->frequency_count; ++i)
+		combo->addItem(QString::number(freqs->frequencies[i]));
+	tobii_research_free_gaze_output_frequencies(freqs);
+
+	float current = 0.f;
+	if (tobii_research_get_gaze_output_frequency(et, &current) == TOBII_RESEARCH_STATUS_OK) {
+		const int idx = combo->findText(QString::number(current));
+		if (idx >= 0) combo->setCurrentIndex(idx);
+	}
+}
+
 MainWindow::MainWindow(QWidget *parent, const char *config_file)
 	: QMainWindow(parent), ui(new Ui::MainWindow) {
 	ui->setupUi(this);
@@ -77,6 +107,8 @@ MainWindow::MainWindow(QWidget *parent, const char *config_file)
 		[this]() { QMessageBox::about(this, "LSL TobiiPro App", tobiisdklicense); });
 	QObject::connect(ui->findButton, &QPushButton::clicked, this, &MainWindow::refresh_eyetrackers);
 	connect(ui->linkButton, &QPushButton::clicked, this, &MainWindow::toggleRecording);
+	connect(ui->trackerDropdown, &QComboBox::currentTextChanged, this,
+		[this](const QString &address) { populate_rates(ui->samplingrate, address); });
 
 	QString cfgfilepath = find_config_file(config_file);
 	load_config(cfgfilepath);
@@ -119,28 +151,12 @@ void MainWindow::refresh_eyetrackers() {
 			tobii_str_wrap_QString(&tobii_research_get_address, eyetrackers->eyetrackers[i]));
 	}
 
-	// Populate the sampling-rate dropdown from what the device actually
-	// supports. Upstream shipped this combo empty and never read it, which is
-	// why selecting a rate had no effect.
-	ui->samplingrate->clear();
-	if (eyetrackers->count > 0) {
-		TobiiResearchGazeOutputFrequencies *freqs = nullptr;
-		if (tobii_research_get_all_gaze_output_frequencies(
-				eyetrackers->eyetrackers[0], &freqs) == TOBII_RESEARCH_STATUS_OK) {
-			for (std::size_t i = 0; i < freqs->frequency_count; ++i)
-				ui->samplingrate->addItem(QString::number(freqs->frequencies[i]));
-			tobii_research_free_gaze_output_frequencies(freqs);
-
-			// Preselect whatever the device is currently set to.
-			float current = 0.f;
-			if (tobii_research_get_gaze_output_frequency(
-					eyetrackers->eyetrackers[0], &current) == TOBII_RESEARCH_STATUS_OK) {
-				int idx = ui->samplingrate->findText(QString::number(current));
-				if (idx >= 0) ui->samplingrate->setCurrentIndex(idx);
-			}
-		}
-	}
+	// Rates for whichever tracker is now selected. Adding items above emits
+	// currentTextChanged, so this is belt-and-braces for the single-tracker case
+	// where the index does not change.
+	populate_rates(ui->samplingrate, ui->trackerDropdown->currentText());
 }
+
 
 void MainWindow::toggleRecording() {
 	if (!gaze_stream) {
