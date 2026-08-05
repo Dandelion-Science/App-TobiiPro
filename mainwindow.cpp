@@ -118,6 +118,28 @@ void MainWindow::refresh_eyetrackers() {
 		ui->trackerDropdown->addItem(
 			tobii_str_wrap_QString(&tobii_research_get_address, eyetrackers->eyetrackers[i]));
 	}
+
+	// Populate the sampling-rate dropdown from what the device actually
+	// supports. Upstream shipped this combo empty and never read it, which is
+	// why selecting a rate had no effect.
+	ui->samplingrate->clear();
+	if (eyetrackers->count > 0) {
+		TobiiResearchGazeOutputFrequencies *freqs = nullptr;
+		if (tobii_research_get_all_gaze_output_frequencies(
+				eyetrackers->eyetrackers[0], &freqs) == TOBII_RESEARCH_STATUS_OK) {
+			for (std::size_t i = 0; i < freqs->frequency_count; ++i)
+				ui->samplingrate->addItem(QString::number(freqs->frequencies[i]));
+			tobii_research_free_gaze_output_frequencies(freqs);
+
+			// Preselect whatever the device is currently set to.
+			float current = 0.f;
+			if (tobii_research_get_gaze_output_frequency(
+					eyetrackers->eyetrackers[0], &current) == TOBII_RESEARCH_STATUS_OK) {
+				int idx = ui->samplingrate->findText(QString::number(current));
+				if (idx >= 0) ui->samplingrate->setCurrentIndex(idx);
+			}
+		}
+	}
 }
 
 void MainWindow::toggleRecording() {
@@ -132,7 +154,22 @@ void MainWindow::toggleRecording() {
 			if (res != TOBII_RESEARCH_STATUS_OK)
 				throw std::runtime_error("Could not connect: " + std::to_string(res));
 
-			const auto samplingrate = 600; // TODO
+			// Apply the selected rate, if the dropdown offers one.
+			bool rate_ok = false;
+			const float wanted = ui->samplingrate->currentText().toFloat(&rate_ok);
+			if (rate_ok && wanted > 0.f) {
+				if (auto sres = tobii_research_set_gaze_output_frequency(current_tracker, wanted))
+					qWarning() << "Could not set gaze output frequency:" << sres;
+			}
+
+			// Read back the ACTUAL rate rather than trusting the request, so
+			// nominal_srate can never disagree with what is delivered.
+			float actual = 0.f;
+			if (tobii_research_get_gaze_output_frequency(current_tracker, &actual)
+					!= TOBII_RESEARCH_STATUS_OK || actual <= 0.f)
+				throw std::runtime_error("Could not read gaze output frequency from device");
+			const double samplingrate = actual;
+			qInfo() << "Streaming at" << samplingrate << "Hz";
 			// Start LSL outlet
 			std::string streamname = "Tobii";
 			lsl::stream_info info(streamname, "Gaze", 6, samplingrate, lsl::cf_float32,
@@ -142,7 +179,7 @@ void MainWindow::toggleRecording() {
 			info.desc()
 				.append_child("acquisition")
 				.append_child_value("manufacturer", "TobiiPro")
-				.append_child_value("model", "TODO")
+				.append_child_value("model", tobii_str_wrap(&tobii_research_get_model, current_tracker))
 				.append_child_value("application", "TobiiProApp")
 				.append_child_value("precision", "24");
 
