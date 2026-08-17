@@ -39,10 +39,15 @@ entry does this with `Path=`.
 `BUNDLE_SDK` defaults to `OFF`: `libtobii_research.so` is not copied into the
 install tree, and `TOBII_SDK_ROOT/lib` is baked in as an RPATH instead. This app
 is GPLv3 and the SDK is proprietary, so the two must not be distributed together
-— and the RPATH guarantees the app loads the SDK build it was compiled against.
-A different build (Eye Tracker Manager ships one) loads fine, enumerates
-trackers, then streams gaze compressed toward the screen centre. To tell them
-apart, look at each screen corner: gaze should span roughly 0.0–1.0 on both axes.
+— and the RPATH makes the app find the build it was compiled against with no
+wrapper and no environment set up. It is a `DT_RUNPATH`, which the loader
+searches *after* `LD_LIBRARY_PATH`, so it is a default and not a guarantee: an
+`LD_LIBRARY_PATH` pointing at another copy still wins.
+
+That matters because a different build (Eye Tracker Manager ships one) loads
+fine, enumerates trackers, then streams gaze compressed toward the screen
+centre. To tell them apart, look at each screen corner: gaze should span roughly
+0.0–1.0 on both axes.
 
 ### Changes from upstream
 

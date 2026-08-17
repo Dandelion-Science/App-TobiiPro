@@ -10,7 +10,8 @@
 # `make deps` covers neither liblsl (not packaged by any distro) nor the Tobii
 # Pro C SDK (proprietary): point LSL_INSTALL_ROOT and TOBII_SDK_ROOT at them.
 # TOBII_SDK_ROOT holds include/ and lib/, and is baked into the binary as an
-# RPATH, so the SDK it is built against is the one it loads.
+# RPATH, so it loads that build with no environment set up — though a
+# DT_RUNPATH is searched after LD_LIBRARY_PATH, which can still override it.
 
 PREFIX           ?= /usr/local
 DESTDIR          ?=
