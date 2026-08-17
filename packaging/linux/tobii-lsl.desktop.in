@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Tobii LSL
+GenericName=Eye Tracking
+Comment=Stream Tobii Pro eye tracker gaze data over Lab Streaming Layer
+Exec=@TOBIIPRO_EXEC_PATH@
+Path=@TOBIIPRO_WORKING_DIR@
+Icon=tobii-lsl
+Terminal=false
+Categories=Science;
+Keywords=Gaze;EyeTracking;LSL;Tobii;
+StartupWMClass=TobiiPro
